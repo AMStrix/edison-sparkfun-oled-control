@@ -41,6 +41,7 @@ eagle.epf
 
 # others
 *.*~
+*.swp
 
 # Example builds
 edison_control
