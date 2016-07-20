@@ -40,8 +40,8 @@ eagle.epf
 *.o
 
 # others
-*.*~
+*~
 *.swp
 
 # Example builds
-edison_control
+src/main
