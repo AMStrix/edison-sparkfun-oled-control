@@ -59,6 +59,8 @@ void updateCpuData() {
     cpuUsage = 100 - atoi(exec("top -n 1 -b | grep -E 'CPU.+[0-9]+\% idle' | grep -Eo '[0-9]+\% idle' | grep -Eo '[0-9]+'"));
 }
 
+
+
 void drawWifi(edOLED o, int on) {
     if (on) {
         o.line(0, 0, 10, 0);
@@ -74,6 +76,24 @@ void drawBattery(edOLED o, int pct) {
     o.rect(LCDWIDTH - 20, 0, 20, 6);
     o.rectFill(LCDWIDTH - 19, 1,(int)round(((double)pct/100)*20) ,5);
 }
+void drawCpu(edOLED o, int pct) {
+    o.pixel(0, 10); o.pixel(1, 10);
+    o.pixel(0, 11);
+    o.pixel(0, 12);
+    o.pixel(0, 13); o.pixel(1, 13);
+
+    o.line(3, 10, 3, 14);
+    o.line(3, 10, 5, 10);
+    o.line(5, 10, 5, 13);
+    o.line(5, 12, 3, 12);
+
+    o.line(7, 10, 7, 13);
+    o.line(7, 13, 10, 13);
+    o.line(9, 13, 9, 10);
+
+    o.rect(11, 10, LCDWIDTH - 11, 4);
+    o.rectFill(11, 10, (int)round(((double)pct/100)*(LCDWIDTH - 11)), 4);
+}
 void drawExit(edOLED o) {
     o.clear(PAGE);
     o.setCursor(10,20);
@@ -84,6 +104,8 @@ void drawExit(edOLED o) {
     o.clear(PAGE);
     o.display();
 }
+
+
 
 void handleSignal(int sig) {
     switch(sig) {
@@ -102,6 +124,7 @@ void updateAllData() {
 void render() {
     drawWifi(oled, isWifiConnected);
     drawBattery(oled, batteryLevel);
+    drawCpu(oled, cpuUsage);
     oled.display();
 }
 int main(void) {
@@ -111,9 +134,9 @@ int main(void) {
     oled.clear(PAGE);
     oled.display();
 
-    oled.setCursor(10,20);
-    oled.setFontType(0);
-    oled.print("hi there");
+    // oled.setCursor(10,20);
+    // oled.setFontType(0);
+    // oled.print("hi there");
 
     oled.display();
     
