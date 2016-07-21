@@ -1,6 +1,8 @@
 ## Intel Edison/Sparkfun OLED
 
-Basic status and control of Intel Edison via Sparkfun OLED breakout board.
+Basic status and control of Intel Edison via Sparkfun OLED breakout board.  
+
+![image](https://github.com/AMStrix/edison-sparkfun-oled-control/blob/master/image.jpg?raw=true)
 
 **Intel Edison**  
 https://en.wikipedia.org/wiki/Intel_Edison
