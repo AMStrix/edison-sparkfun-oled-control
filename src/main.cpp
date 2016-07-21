@@ -6,6 +6,7 @@
 #include <string.h>
 #include <math.h>
 #include <signal.h>
+#include <regex.h>
 
 edOLED oled;
 
@@ -13,6 +14,9 @@ char* wifiIp;
 int isWifiConnected = 0;
 int batteryLevel = 0;
 int cpuUsage = 0;
+int memoryUsage = 0;
+int ssdUsage = 0;
+int networkConnections = 0;
 
 char* exec(const char* command) {
     FILE* fp;
@@ -56,9 +60,51 @@ void updateWifiData() {
 }
 
 void updateCpuData() {
-    cpuUsage = 100 - atoi(exec("top -n 1 -b | grep -E 'CPU.+[0-9]+\% idle' | grep -Eo '[0-9]+\% idle' | grep -Eo '[0-9]+'"));
+    cpuUsage = 100 - atoi(exec("top -d 1 -n 1 -b | grep -E 'CPU.+[0-9]+\% idle' | grep -Eo '[0-9]+\% idle' | grep -Eo '[0-9]+' | tail -1"));
 }
 
+void updateMemoryData() {
+    int res;
+    int len;
+    char result[BUFSIZ];
+    char err_buf[BUFSIZ];
+    char* src = exec("top -n 1 -b | grep -E 'Mem: [0-9]+.+ used,'");  
+    const char* pattern = "([0-9]+)K used, ([0-9]+)K free";
+    regex_t preg;
+    regmatch_t pmatch[10];
+    if ( (res = regcomp(&preg, pattern, REG_EXTENDED)) != 0) {
+        regerror(res, &preg, err_buf, BUFSIZ);
+        printf("regcomp: %s\n", err_buf);
+        return;
+    }
+    res = regexec(&preg, src, 10, pmatch, REG_NOTBOL);
+    if (res == REG_NOMATCH) {
+        return;
+    }
+
+    len = pmatch[1].rm_eo - pmatch[1].rm_so;
+    memcpy(result, src + pmatch[1].rm_so, len);
+    result[len] = 0;
+    int used = atoi(result);
+
+    len = pmatch[2].rm_eo - pmatch[2].rm_so;
+    memcpy(result, src + pmatch[2].rm_so, len);
+    result[len] = 0;
+    int free = atoi(result);
+
+    memoryUsage = (int)round(((double)used / (used + free)) * 100);
+    printf("%d %d %d pct\n", used, free, memoryUsage);
+
+    regfree(&preg);
+}
+
+void updateSsdData() {
+    ssdUsage = atoi(exec("df -a /home | grep -Eo '[0-9]+%'"));
+}
+
+void updateNetworkConnections() {
+    networkConnections = atoi(exec("netstat -an | grep ESTABLISHED | wc -l"));
+}
 
 
 void drawWifi(edOLED o, int on) {
@@ -94,13 +140,59 @@ void drawCpu(edOLED o, int pct) {
     o.rect(11, 10, LCDWIDTH - 11, 4);
     o.rectFill(11, 10, (int)round(((double)pct/100)*(LCDWIDTH - 11)), 4);
 }
+void drawMemory(edOLED o, int pct, int x, int y) {
+    o.line(x    , y    , x    , y + 5);
+    o.line(x    , y + 1, x + 3, y + 1);
+    o.line(x + 2, y + 5, x + 2, y    );
+
+    o.line(x + 4, y    , x + 4, y + 5);
+    o.pixel(x + 5, y);
+    o.pixel(x + 5, y + 2);
+    o.pixel(x + 5, y + 4);
+
+    o.line(x + 7, y + 0, x + 7,  y + 5);
+    o.line(x + 7, y + 1, x + 10, y + 1);
+    o.line(x + 9, y + 5, x + 9,  y + 0);
+
+    o.rect(x + 11, y, LCDWIDTH - (x + 11), 5);
+    o.rectFill(x + 11, y, (int)round(((double)pct/100)*(LCDWIDTH - (x + 11))), 5);
+}
+void drawSsd(edOLED o, int pct, int x, int y) {
+    o.line(x     , y    , x + 2, y + 0);
+    o.pixel(x    , y + 1);
+    o.line(x     , y + 2, x + 2, y + 2);
+    o.pixel(x + 1, y + 3);
+    o.line(x     , y + 4, x + 2, y + 4);
+
+    o.line( x + 3, y    , x + 5, y + 0);
+    o.pixel(x + 3, y + 1);
+    o.line( x + 3, y + 2, x + 5, y + 2);
+    o.pixel(x + 4, y + 3);
+    o.line( x + 3, y + 4, x + 5, y + 4);
+
+    o.line( x + 6, y + 0, x + 6, y + 5);
+    o.pixel(x + 7, y + 0);
+    o.line( x + 8, y + 1, x + 8, y + 4);
+    o.pixel(x + 7, y + 4);
+
+    o.rect(x + 11, y, LCDWIDTH - (x + 11), 5);
+    o.rectFill(x + 11, y, (int)round(((double)pct/100)*(LCDWIDTH - (x + 11))), 5);
+}
+void drawNetworkConnections(edOLED o, int n, int x, int y) {
+    o.setCursor(x, y);
+    o.setFontType(0);
+    char* msg;
+    asprintf(&msg, "CON %d", n);
+    o.print(msg);
+    free(msg);
+}
 void drawExit(edOLED o) {
     o.clear(PAGE);
     o.setCursor(10,20);
     o.setFontType(0);
     o.print("goodbye");
     o.display();
-    sleep(3);
+    sleep(1);
     o.clear(PAGE);
     o.display();
 }
@@ -120,11 +212,18 @@ void updateAllData() {
     updateBatteryData();
     updateCpuData();
     updateWifiData();
+    updateMemoryData();
+    updateSsdData();
+    updateNetworkConnections();
 }
 void render() {
+    oled.clear(PAGE);
     drawWifi(oled, isWifiConnected);
     drawBattery(oled, batteryLevel);
     drawCpu(oled, cpuUsage);
+    drawMemory(oled, memoryUsage, 0, 16);
+    drawSsd(oled, ssdUsage, 0, 23);
+    drawNetworkConnections(oled, networkConnections, 0, 30);
     oled.display();
 }
 int main(void) {
@@ -133,19 +232,10 @@ int main(void) {
     oled.begin();
     oled.clear(PAGE);
     oled.display();
-
-    // oled.setCursor(10,20);
-    // oled.setFontType(0);
-    // oled.print("hi there");
-
-    oled.display();
     
     while(1) {
         updateAllData();
         render();
-        printf("isWifiConnected [%s]\n", wifiIp);
-        printf("getBatteryLevel %d\n", batteryLevel);
-        printf("cpuUsage %d", cpuUsage);
         sleep(5);
     }
 

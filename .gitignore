@@ -44,4 +44,4 @@ eagle.epf
 *.swp
 
 # Example builds
-src/main
+main
